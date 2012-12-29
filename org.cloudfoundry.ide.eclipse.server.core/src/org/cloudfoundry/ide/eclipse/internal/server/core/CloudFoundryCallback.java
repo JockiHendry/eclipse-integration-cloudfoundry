@@ -54,6 +54,8 @@ public abstract class CloudFoundryCallback {
 		public boolean isIncrementalPublish;
 		
 		public Staging staging;
+		
+		public StandaloneWithContainer standaloneWithContainer;
 
 	}
 
