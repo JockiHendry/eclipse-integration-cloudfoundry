@@ -22,6 +22,7 @@ import org.cloudfoundry.ide.eclipse.internal.server.core.CloudFoundryServer;
 import org.cloudfoundry.ide.eclipse.internal.server.core.CloudUtil;
 import org.cloudfoundry.ide.eclipse.internal.server.core.DeploymentConfiguration;
 import org.cloudfoundry.ide.eclipse.internal.server.core.DeploymentInfoValidator;
+import org.cloudfoundry.ide.eclipse.internal.server.core.StandaloneWithContainer;
 import org.cloudfoundry.ide.eclipse.internal.server.core.ValueValidationUtil;
 import org.cloudfoundry.ide.eclipse.internal.server.core.debug.CloudFoundryProperties;
 import org.cloudfoundry.ide.eclipse.internal.server.ui.CloudFoundryImages;
@@ -86,7 +87,7 @@ public class CloudFoundryDeploymentWizardPage extends WizardPage implements ISta
 	private Composite runDebugOptions;
 
 	private Button regularStartOnDeploymentButton;
-
+		
 	private final CloudFoundryApplicationWizard wizard;
 
 	private final ApplicationModule module;
@@ -96,7 +97,19 @@ public class CloudFoundryDeploymentWizardPage extends WizardPage implements ISta
 	private ApplicationAction deploymentMode;
 
 	private StandaloneStartCommandPart standalonePart;
-
+	
+	private Button deployWithContainerButton;
+	
+	private boolean isDeployWithContainer;
+	
+	private Text containerDirectoryText;
+	
+	private String containerDirectory;
+	
+	private Text deployDirectoryText;
+	
+	private String deployDirectory;
+	
 	public CloudFoundryDeploymentWizardPage(CloudFoundryServer server, ApplicationModule module,
 			CloudFoundryApplicationWizard wizard) {
 		super("deployment");
@@ -271,10 +284,11 @@ public class CloudFoundryDeploymentWizardPage extends WizardPage implements ISta
 			standalonePart = new StandaloneStartCommandPart(wizard.getStandaloneHandler().getStartCommand(), this,
 					project);
 			standalonePart.createPart(topComposite);
+			createDeployWithContainer(topComposite);
 		}
-
+				
 		createStartOrDebugOptions(topComposite);
-
+		
 		setControl(composite);
 
 		update(false);
@@ -285,6 +299,54 @@ public class CloudFoundryDeploymentWizardPage extends WizardPage implements ISta
 			return standalonePart.getStandaloneStartCommand();
 		}
 		return null;
+	}
+	
+	protected void createDeployWithContainer(Composite parent) {
+		deployWithContainerButton = new Button(parent, SWT.CHECK);
+		deployWithContainerButton.setText("Include container (such as Tomcat 7) as part of deployment");
+		deployWithContainerButton.setSelection(false);
+		deployWithContainerButton.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				boolean deployWithContainer = deployWithContainerButton.getSelection();
+				isDeployWithContainer = deployWithContainer;
+				containerDirectoryText.setEditable(deployWithContainer);
+				deployDirectoryText.setEditable(deployWithContainer);
+			}
+		});
+		
+		GridData buttonData = new GridData(SWT.FILL, SWT.NONE, false, false);
+		buttonData.horizontalSpan = 2;
+		buttonData.verticalIndent = 10;		
+		deployWithContainerButton.setLayoutData(buttonData);
+		
+		Label label = new Label(parent, SWT.NONE);
+		label.setText("Container directory: ");
+		label.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false));
+		
+		containerDirectoryText = new Text(parent, SWT.BORDER);
+		containerDirectoryText.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
+		containerDirectoryText.setEditable(false);
+		containerDirectoryText.addModifyListener(new ModifyListener() {
+			public void modifyText(ModifyEvent e) {
+				containerDirectory = containerDirectoryText.getText();
+				update();
+			};
+		});
+		
+		label = new Label(parent, SWT.NONE);
+		label.setText("Deploy directory: ");
+		label.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false));
+		
+		deployDirectoryText = new Text(parent, SWT.BORDER);
+		deployDirectoryText.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
+		deployDirectoryText.setEditable(false);
+		deployDirectoryText.addModifyListener(new ModifyListener() {
+			public void modifyText(ModifyEvent e) {
+				deployDirectory = deployDirectoryText.getText();
+				update();
+			}
+		});
 	}
 
 	protected void createStartOrDebugOptions(Composite parent) {
@@ -394,6 +456,18 @@ public class CloudFoundryDeploymentWizardPage extends WizardPage implements ISta
 			}
 		}
 	}
+	
+	public StandaloneWithContainer getStandaloneWithContainer() {
+		if (isDeployWithContainer) {
+			if (!containerDirectory.isEmpty()) {
+				StandaloneWithContainer standaloneWithContainerInfo = new StandaloneWithContainer();
+				standaloneWithContainerInfo.setContainerDirectory(containerDirectory);
+				standaloneWithContainerInfo.setDeployDirectory(deployDirectory);
+				return standaloneWithContainerInfo;
+			}
+		} 
+		return null;
+	}
 
 	public DeploymentInfo getDeploymentInfo() {
 		DeploymentInfo info = new DeploymentInfo();
@@ -428,7 +502,7 @@ public class CloudFoundryDeploymentWizardPage extends WizardPage implements ISta
 		canFinish = true;
 
 		DeploymentInfoValidator validator = new DeploymentInfoValidator(urlText.getText(), getStandaloneStartCommand(),
-				wizard.isStandaloneApplication());
+				wizard.isStandaloneApplication(), isDeployWithContainer, containerDirectory);
 
 		IStatus status = validator.isValid();
 		canFinish = status.getSeverity() == IStatus.OK;

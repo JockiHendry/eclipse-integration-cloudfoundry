@@ -22,6 +22,7 @@ import org.cloudfoundry.ide.eclipse.internal.server.core.ApplicationModule;
 import org.cloudfoundry.ide.eclipse.internal.server.core.CloudFoundryServer;
 import org.cloudfoundry.ide.eclipse.internal.server.core.JavaRuntimeTypeHelper;
 import org.cloudfoundry.ide.eclipse.internal.server.core.RuntimeType;
+import org.cloudfoundry.ide.eclipse.internal.server.core.StandaloneWithContainer;
 import org.cloudfoundry.ide.eclipse.internal.server.core.standalone.StandaloneHandler;
 import org.cloudfoundry.ide.eclipse.internal.server.ui.standalone.StandaloneApplicationWizardPage;
 import org.eclipse.core.runtime.Assert;
@@ -42,7 +43,7 @@ public class CloudFoundryApplicationWizard extends Wizard {
 	private CloudFoundryApplicationServicesWizardPage servicesPage;
 
 	private final ApplicationModule module;
-
+	
 	private StandaloneHandler standaloneHandler;
 
 	private final CloudFoundryServer server;
@@ -120,6 +121,10 @@ public class CloudFoundryApplicationWizard extends Wizard {
 
 	public DeploymentInfo getDeploymentInfo() {
 		return deploymentPage.getDeploymentInfo();
+	}
+	
+	public StandaloneWithContainer getStandaloneWithContainer() {
+		return deploymentPage.getStandaloneWithContainer();
 	}
 
 	public ApplicationAction getDeploymentMode() {

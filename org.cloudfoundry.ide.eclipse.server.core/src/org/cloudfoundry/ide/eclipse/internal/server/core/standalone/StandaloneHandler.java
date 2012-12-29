@@ -12,6 +12,7 @@ package org.cloudfoundry.ide.eclipse.internal.server.core.standalone;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import org.cloudfoundry.client.lib.domain.CloudApplication;
 import org.cloudfoundry.client.lib.domain.Staging;
@@ -21,7 +22,11 @@ import org.cloudfoundry.ide.eclipse.internal.server.core.CloudFoundryServer;
 import org.cloudfoundry.ide.eclipse.internal.server.core.JavaRuntimeTypeHelper;
 import org.cloudfoundry.ide.eclipse.internal.server.core.RuntimeType;
 import org.eclipse.core.resources.IProject;
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.wst.common.project.facet.core.IFacetedProject;
+import org.eclipse.wst.common.project.facet.core.IProjectFacetVersion;
+import org.eclipse.wst.common.project.facet.core.ProjectFacetsManager;
 import org.eclipse.wst.server.core.IModule;
 
 /**
@@ -66,6 +71,21 @@ public class StandaloneHandler {
 			Staging staging = getStaging();
 			isStandalone = staging != null && CloudApplication.STANDALONE.equals(staging.getFramework());
 		}
+		
+		// Check project facet
+		if (!isStandalone && module != null) {
+			try {
+				IFacetedProject facetedProject = ProjectFacetsManager.create(module.getProject());			
+				if (facetedProject.getInstalledVersion(StandaloneFacetHandler.FACET)!=null) {
+					isStandalone = true;
+				}
+			}
+			catch (CoreException e) {
+				// do nothing
+			}
+			
+		}
+		
 		return isStandalone;
 	}
 

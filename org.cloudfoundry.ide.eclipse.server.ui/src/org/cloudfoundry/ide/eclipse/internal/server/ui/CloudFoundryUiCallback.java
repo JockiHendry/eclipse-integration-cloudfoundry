@@ -116,6 +116,7 @@ public class CloudFoundryUiCallback extends CloudFoundryCallback {
 			descriptor.deploymentInfo = new DeploymentInfo();
 			descriptor.deploymentInfo.setUris(existingApp.getUris());
 			descriptor.deploymentMode = ApplicationAction.START;
+			descriptor.standaloneWithContainer = appModule.getStandaloneWithContainerInfo();
 
 			// FIXNS_STANDALONE: uncomment when CF client supports staging
 			// descriptor.staging = getStaging(appModule);
@@ -159,6 +160,7 @@ public class CloudFoundryUiCallback extends CloudFoundryCallback {
 							descriptorToUpdate.applicationInfo = wizard.getApplicationInfo();
 							descriptorToUpdate.deploymentInfo = wizard.getDeploymentInfo();
 							descriptorToUpdate.deploymentMode = wizard.getDeploymentMode();
+							descriptorToUpdate.standaloneWithContainer = wizard.getStandaloneWithContainer();
 
 							descriptorToUpdate.staging = wizard.getStaging();
 							// First add any new services to the server

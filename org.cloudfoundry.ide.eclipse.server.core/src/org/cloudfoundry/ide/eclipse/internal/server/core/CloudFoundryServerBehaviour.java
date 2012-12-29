@@ -44,6 +44,7 @@ import org.cloudfoundry.ide.eclipse.internal.server.core.debug.DebugModeType;
 import org.cloudfoundry.ide.eclipse.internal.server.core.spaces.CloudFoundrySpace;
 import org.cloudfoundry.ide.eclipse.internal.server.core.spaces.CloudSpaceServerLookup;
 import org.cloudfoundry.ide.eclipse.internal.server.core.standalone.StandaloneApplicationArchive;
+import org.cloudfoundry.ide.eclipse.internal.server.core.standalone.StandaloneApplicationArchiveWithContainer;
 import org.cloudfoundry.ide.eclipse.internal.server.core.standalone.StandaloneHandler;
 import org.eclipse.core.runtime.Assert;
 import org.eclipse.core.runtime.CoreException;
@@ -1613,6 +1614,7 @@ public class CloudFoundryServerBehaviour extends ServerBehaviourDelegate {
 
 				// Update the Staging in the Application module
 				cloudModule.setStaging(descriptor.staging);
+				cloudModule.setStandaloneWithContainerInfo(descriptor.standaloneWithContainer);
 
 				server.setModuleState(modules, IServer.STATE_STARTING);
 				setRefreshInterval(SHORT_INTERVAL);
@@ -1646,8 +1648,27 @@ public class CloudFoundryServerBehaviour extends ServerBehaviourDelegate {
 													.getErrorStatus("Unable to deploy standalone Java module. No deployable resources found in target or output folders."));
 								}
 								else {
-									descriptor.applicationArchive = new StandaloneApplicationArchive(modules[0],
+									if (descriptor.standaloneWithContainer==null) {
+										descriptor.applicationArchive = new StandaloneApplicationArchive(modules[0],
 											Arrays.asList(resources));
+									} else {
+										// This is standalone framework application with container deployment
+										
+										// Always create a full war archive (no incremental publish support yet!)
+										File warFile = CloudUtil.createWarFile(modules, server, progress);
+										if (!warFile.exists()) {
+											throw new CoreException(new Status(IStatus.ERROR, CloudFoundryPlugin.PLUGIN_ID,
+													"Unable to create war file"));
+										}
+										
+										// Create container archie
+										descriptor.applicationArchive = new StandaloneApplicationArchiveWithContainer(modules[0], 
+											Arrays.asList(resources), 
+											descriptor.standaloneWithContainer.getContainerDirectory(), 
+											descriptor.standaloneWithContainer.getDeployDirectory(),
+											warFile);
+									}
+									
 								}
 
 							}
