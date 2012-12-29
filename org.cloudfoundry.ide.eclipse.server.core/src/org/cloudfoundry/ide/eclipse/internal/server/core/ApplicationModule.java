@@ -66,6 +66,8 @@ public class ApplicationModule extends ExternalModule {
 	private DeploymentInfo lastDeploymentInfo;
 
 	private Staging staging;
+	
+	private StandaloneWithContainer standaloneWithContainerInfo;
 
 	private IModule localModule;
 
@@ -101,6 +103,10 @@ public class ApplicationModule extends ExternalModule {
 
 	public Staging getStaging() {
 		return staging;
+	}
+	
+	public StandaloneWithContainer getStandaloneWithContainerInfo() {
+		return standaloneWithContainerInfo;
 	}
 
 	public String getDefaultLaunchUrl() {
@@ -179,6 +185,10 @@ public class ApplicationModule extends ExternalModule {
 
 	public void setStaging(Staging staging) {
 		this.staging = staging;
+	}
+	
+	public void setStandaloneWithContainerInfo(StandaloneWithContainer standaloneWithContainer) {
+		this.standaloneWithContainerInfo = standaloneWithContainer;
 	}
 
 	public void setApplicationStats(ApplicationStats applicationStats) {
