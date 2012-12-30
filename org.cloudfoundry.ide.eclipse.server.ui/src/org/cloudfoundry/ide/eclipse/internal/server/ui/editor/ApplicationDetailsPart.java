@@ -26,6 +26,7 @@ import org.cloudfoundry.ide.eclipse.internal.server.core.ApplicationModule;
 import org.cloudfoundry.ide.eclipse.internal.server.core.CloudFoundryBrandingExtensionPoint;
 import org.cloudfoundry.ide.eclipse.internal.server.core.CloudFoundryServer;
 import org.cloudfoundry.ide.eclipse.internal.server.core.CloudFoundryServerBehaviour;
+import org.cloudfoundry.ide.eclipse.internal.server.core.StandaloneWithContainer;
 import org.cloudfoundry.ide.eclipse.internal.server.core.debug.CloudFoundryProperties;
 import org.cloudfoundry.ide.eclipse.internal.server.core.debug.DebugCommand;
 import org.cloudfoundry.ide.eclipse.internal.server.core.debug.DebugCommandBuilder;
@@ -70,6 +71,8 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.DND;
 import org.eclipse.swt.dnd.DropTarget;
 import org.eclipse.swt.dnd.Transfer;
+import org.eclipse.swt.events.FocusAdapter;
+import org.eclipse.swt.events.FocusEvent;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
@@ -82,9 +85,11 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Link;
 import org.eclipse.swt.widgets.Menu;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Spinner;
 import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableColumn;
@@ -158,6 +163,10 @@ public class ApplicationDetailsPart extends AbstractFormPart implements IDetails
 	private Button connectToDebugger;
 
 	private Combo memoryCombo;
+	
+	private Link containerDirectoryLink;
+	
+	private Text deployDirectoryText;
 
 	/**
 	 * This must NOT be set directly. Use appropriate setter
@@ -459,9 +468,21 @@ public class ApplicationDetailsPart extends AbstractFormPart implements IDetails
 					memoryCombo.select(0);
 				}
 				memoryCombo.setEnabled(true);
-			}
+			}			
 		}
-
+		
+		StandaloneWithContainer standaloneWithContainerInfo = appModule.getStandaloneWithContainerInfo();
+		boolean enabled = cloudApplication!=null && standaloneWithContainerInfo!=null;		
+		containerDirectoryLink.setEnabled(enabled);	
+		deployDirectoryText.setEnabled(enabled);	
+		if (standaloneWithContainerInfo!=null) {
+			containerDirectoryLink.setText(getURIAsLinkText(standaloneWithContainerInfo.getContainerDirectory().getAbsolutePath()));
+			deployDirectoryText.setText(standaloneWithContainerInfo.getDeployDirectory());
+		} else {
+			containerDirectoryLink.setText("Not a standalone with container");
+			deployDirectoryText.setText("Not a standalone with container");
+		}
+ 
 		List<String> currentURIs = null;
 		if (cloudApplication != null) {
 			currentURIs = cloudApplication.getUris();
@@ -689,7 +710,45 @@ public class ApplicationDetailsPart extends AbstractFormPart implements IDetails
 			}
 		});
 		toolkit.adapt(instanceSpinner);
+		
+		// For standalone framework application with container deployment
+		createLabel(client, "Container Directory:", SWT.CENTER);
+		containerDirectoryLink = new Link(client, SWT.MULTI);
+		adaptControl(containerDirectoryLink);
+		GridDataFactory.fillDefaults().align(SWT.FILL, SWT.CENTER).applyTo(containerDirectoryLink);
+		
+		final Shell shell = client.getShell();
+		containerDirectoryLink.addSelectionListener(new SelectionAdapter() {
 
+			DirectoryDialog dialog = new DirectoryDialog(shell);
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				dialog.setMessage("Select a directory that contains application container.  The contents of this directory will be deployed to server.");
+				dialog.setFilterPath(e.text);				
+				String selectedDirectory = dialog.open();
+				if (selectedDirectory!=null) {
+					containerDirectoryLink.setText(getURIAsLinkText(selectedDirectory));	
+					StandaloneWithContainer standaloneWithContainerInfo = getApplication().getStandaloneWithContainerInfo();
+					standaloneWithContainerInfo.setContainerDirectory(selectedDirectory);
+					getApplication().setStandaloneWithContainerInfo(standaloneWithContainerInfo);
+				}
+			}
+		});		
+		
+		createLabel(client, "Deploy Directory:", SWT.CENTER);
+		deployDirectoryText = new Text(client, SWT.BORDER);		
+		GridDataFactory.fillDefaults().align(SWT.FILL, SWT.CENTER).applyTo(deployDirectoryText);
+		deployDirectoryText.addFocusListener(new FocusAdapter(){
+			@Override
+			public void focusLost(FocusEvent e) {
+				if (!deployDirectoryText.getText().isEmpty()) {
+					StandaloneWithContainer standaloneWithContainerInfo = getApplication().getStandaloneWithContainerInfo();
+					standaloneWithContainerInfo.setDeployDirectory(deployDirectoryText.getText());
+					getApplication().setStandaloneWithContainerInfo(standaloneWithContainerInfo);
+				}
+			}
+		});
+		
 		// FIXNS: Uncomment when CF client supports staging updates
 		// createStandaloneCommandArea(client);
 
@@ -1114,6 +1173,20 @@ public class ApplicationDetailsPart extends AbstractFormPart implements IDetails
 
 		return result.toString();
 	}
+	
+	private static String getURIAsLinkText(String uri) {
+		StringBuilder result = new StringBuilder();
+		if (result.length() > 0) {
+			result.append(", ");
+		}
+		result.append("<a href=\"");
+		result.append(uri);
+		result.append("\">");
+		result.append(uri);
+		result.append("</a>");
+
+		return result.toString();
+	}
 
 	protected class ApplicationDetailsDebugListener implements ICloudFoundryDebuggerListener {
 
@@ -1132,6 +1205,5 @@ public class ApplicationDetailsPart extends AbstractFormPart implements IDetails
 			job.schedule();
 		}
 
-	}
-
+	}		
 }
