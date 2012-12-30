@@ -1655,18 +1655,24 @@ public class CloudFoundryServerBehaviour extends ServerBehaviourDelegate {
 										// This is standalone framework application with container deployment
 										
 										// Always create a full war archive (no incremental publish support yet!)
-										File warFile = CloudUtil.createWarFile(modules, server, progress);
-										if (!warFile.exists()) {
-											throw new CoreException(new Status(IStatus.ERROR, CloudFoundryPlugin.PLUGIN_ID,
-													"Unable to create war file"));
-										}
+										if (descriptor.isIncrementalPublish && !hasChildModules(modules)) {
 										
-										// Create container archie
-										descriptor.applicationArchive = new StandaloneApplicationArchiveWithContainer(modules[0], 
-											Arrays.asList(resources), 
-											descriptor.standaloneWithContainer.getContainerDirectory(), 
-											descriptor.standaloneWithContainer.getDeployDirectory(),
-											warFile);
+											handleIncrementalPublish(descriptor, modules);
+											
+										} else {
+											File warFile = CloudUtil.createWarFile(modules, server, progress);
+											if (!warFile.exists()) {
+												throw new CoreException(new Status(IStatus.ERROR, CloudFoundryPlugin.PLUGIN_ID,
+														"Unable to create war file"));
+											}
+											
+											// Create container archie
+											descriptor.applicationArchive = new StandaloneApplicationArchiveWithContainer(modules[0], 
+												Arrays.asList(resources), 
+												descriptor.standaloneWithContainer.getContainerDirectory(), 
+												descriptor.standaloneWithContainer.getDeployDirectory(),
+												warFile);
+										}
 									}
 									
 								}
@@ -1770,7 +1776,7 @@ public class CloudFoundryServerBehaviour extends ServerBehaviourDelegate {
 		IModuleResourceDelta[] deltas = getPublishedResourceDelta(modules);
 		List<IModuleResource> changedResources = getChangedResources(deltas);
 		ApplicationArchive moduleArchive = new ModuleResourceApplicationArchive(Arrays.asList(allResources),
-				changedResources, modules[0], descriptor.applicationInfo.getAppName());
+				changedResources, modules[0], descriptor.applicationInfo.getAppName(), descriptor);
 
 		descriptor.applicationArchive = moduleArchive;
 

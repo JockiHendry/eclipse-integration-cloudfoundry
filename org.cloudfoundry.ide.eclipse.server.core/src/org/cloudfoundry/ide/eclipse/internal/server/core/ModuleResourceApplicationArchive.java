@@ -11,7 +11,6 @@
 package org.cloudfoundry.ide.eclipse.internal.server.core;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -26,6 +25,7 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
 import org.cloudfoundry.client.lib.archive.ApplicationArchive;
+import org.cloudfoundry.ide.eclipse.internal.server.core.CloudFoundryCallback.DeploymentDescriptor;
 import org.cloudfoundry.ide.eclipse.internal.server.core.DeployedResourceCache.CachedDeployedApplication;
 import org.cloudfoundry.ide.eclipse.internal.server.core.DeployedResourceCache.DeployedResourceEntry;
 import org.eclipse.core.runtime.CoreException;
@@ -66,14 +66,22 @@ public class ModuleResourceApplicationArchive extends AbstractModuleResourceArch
 	private String fileName;
 
 	private final CachedDeployedApplication appID;
+	
+	private final DeploymentDescriptor deploymentDescriptor;
 
 	public ModuleResourceApplicationArchive(List<IModuleResource> allResources, List<IModuleResource> changedResources,
 			IModule module, String appName) {
+		this(allResources, changedResources, module, appName, null);
+	}
+	
+	public ModuleResourceApplicationArchive(List<IModuleResource> allResources, List<IModuleResource> changedResources,
+			IModule module, String appName, DeploymentDescriptor deploymentDescriptor) {
 		super(module, allResources);
 		this.appID = new CachedDeployedApplication(appName);
 		this.changedResources = changedResourcesAsZipNames(changedResources);
+		this.deploymentDescriptor = deploymentDescriptor;
 	}
-
+	
 	protected Set<String> changedResourcesAsZipNames(List<IModuleResource> changedResources) {
 		Set<String> names = new HashSet<String>();
 		for (IModuleResource resource : changedResources) {
@@ -83,6 +91,12 @@ public class ModuleResourceApplicationArchive extends AbstractModuleResourceArch
 	}
 
 	public String getFilename() {
+		if (deploymentDescriptor!=null && deploymentDescriptor.standaloneWithContainer!=null) {
+			String deployDirectory = deploymentDescriptor.standaloneWithContainer.getDeployDirectory();
+			if (!deployDirectory.isEmpty()) {
+				return deployDirectory + "/" + fileName;
+			}
+		}
 		return fileName;
 	}
 
