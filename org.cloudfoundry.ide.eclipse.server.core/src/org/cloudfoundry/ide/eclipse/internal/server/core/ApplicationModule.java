@@ -10,6 +10,9 @@
  *******************************************************************************/
 package org.cloudfoundry.ide.eclipse.internal.server.core;
 
+import java.io.ByteArrayInputStream;
+import java.io.ObjectInputStream;
+
 import org.cloudfoundry.client.lib.domain.ApplicationStats;
 import org.cloudfoundry.client.lib.domain.CloudApplication;
 import org.cloudfoundry.client.lib.domain.CloudApplication.AppState;
@@ -18,9 +21,15 @@ import org.cloudfoundry.client.lib.domain.InstancesInfo;
 import org.cloudfoundry.client.lib.domain.Staging;
 import org.eclipse.core.runtime.Assert;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.wst.server.core.IModule;
 import org.eclipse.wst.server.core.IServer;
 import org.eclipse.wst.server.core.internal.ExternalModule;
+import org.osgi.service.prefs.BackingStoreException;
+import org.osgi.service.prefs.Preferences;
+import org.springframework.util.SerializationUtils;
 
 /**
  * @author Christian Dupuis
@@ -105,10 +114,6 @@ public class ApplicationModule extends ExternalModule {
 		return staging;
 	}
 	
-	public StandaloneWithContainer getStandaloneWithContainerInfo() {
-		return standaloneWithContainerInfo;
-	}
-
 	public String getDefaultLaunchUrl() {
 		return getLaunchUrl(getName());
 	}
@@ -187,10 +192,6 @@ public class ApplicationModule extends ExternalModule {
 		this.staging = staging;
 	}
 	
-	public void setStandaloneWithContainerInfo(StandaloneWithContainer standaloneWithContainer) {
-		this.standaloneWithContainerInfo = standaloneWithContainer;
-	}
-
 	public void setApplicationStats(ApplicationStats applicationStats) {
 		this.applicationStats = applicationStats;
 	}
@@ -225,6 +226,50 @@ public class ApplicationModule extends ExternalModule {
 			return null;
 		}
 		return error.getMessage();
+	}
+
+	public StandaloneWithContainer getStandaloneWithContainerInfo() {		
+		if (standaloneWithContainerInfo==null) {
+			Preferences prefs = InstanceScope.INSTANCE.getNode(CloudFoundryPlugin.PLUGIN_ID);
+			byte[] data = prefs.getByteArray(String.format("%s:%s:%s", MODULE_ID, MODULE_VERSION, getApplicationId()), null);
+			if (data!=null) {								
+				try {
+					ByteArrayInputStream bais = new ByteArrayInputStream(data);
+					ObjectInputStream ois = new ObjectInputStream(bais);
+					standaloneWithContainerInfo = (StandaloneWithContainer) ois.readObject();
+					ois.close();
+					bais.close();					
+				}
+				catch (Exception e) {
+					CloudFoundryPlugin
+					.getDefault()
+					.getLog()
+					.log(new Status(IStatus.ERROR, CloudFoundryPlugin.PLUGIN_ID,
+							"Can't retrieve container directories information", e));
+				} 
+			}
+		}
+		return standaloneWithContainerInfo;
+	}
+
+	public void setStandaloneWithContainerInfo(StandaloneWithContainer standaloneWithContainer) {		
+		this.standaloneWithContainerInfo = standaloneWithContainer;
+		saveStandaloneWithContainerInfo();
+	}
+	
+	public void saveStandaloneWithContainerInfo() {
+		Preferences prefs = InstanceScope.INSTANCE.getNode(CloudFoundryPlugin.PLUGIN_ID);
+		prefs.putByteArray(String.format("%s:%s:%s", MODULE_ID, MODULE_VERSION, getApplicationId()),
+			SerializationUtils.serialize(standaloneWithContainerInfo));
+		try {
+			prefs.flush();
+		} catch (BackingStoreException e) {			
+			CloudFoundryPlugin
+			.getDefault()
+			.getLog()
+			.log(new Status(IStatus.ERROR, CloudFoundryPlugin.PLUGIN_ID,
+					"Can't save container directories information", e));
+		}	
 	}
 
 }
