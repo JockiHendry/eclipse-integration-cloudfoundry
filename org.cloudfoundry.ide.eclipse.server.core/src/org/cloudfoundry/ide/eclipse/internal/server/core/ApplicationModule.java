@@ -23,12 +23,12 @@ import org.eclipse.core.runtime.Assert;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.preferences.IEclipsePreferences;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.wst.server.core.IModule;
 import org.eclipse.wst.server.core.IServer;
 import org.eclipse.wst.server.core.internal.ExternalModule;
 import org.osgi.service.prefs.BackingStoreException;
-import org.osgi.service.prefs.Preferences;
 import org.springframework.util.SerializationUtils;
 
 /**
@@ -83,7 +83,7 @@ public class ApplicationModule extends ExternalModule {
 	private final IServer server;
 
 	private CoreException error;
-
+	
 	public ApplicationModule(IModule module, String name, IServer server) {
 		super(name, name, MODULE_ID, MODULE_VERSION, null);
 		Assert.isNotNull(name);
@@ -228,9 +228,16 @@ public class ApplicationModule extends ExternalModule {
 		return error.getMessage();
 	}
 
+	private IEclipsePreferences preferences;
+	private IEclipsePreferences getPreferences() {
+		if (preferences==null) {
+			preferences = new InstanceScope().getNode(CloudFoundryPlugin.PLUGIN_ID);
+		}
+		return preferences;
+	}
 	public StandaloneWithContainer getStandaloneWithContainerInfo() {		
-		if (standaloneWithContainerInfo==null) {
-			Preferences prefs = InstanceScope.INSTANCE.getNode(CloudFoundryPlugin.PLUGIN_ID);
+		if (standaloneWithContainerInfo==null) {				
+			IEclipsePreferences prefs = getPreferences();
 			byte[] data = prefs.getByteArray(String.format("%s:%s:%s", MODULE_ID, MODULE_VERSION, getApplicationId()), null);
 			if (data!=null) {								
 				try {
@@ -258,18 +265,19 @@ public class ApplicationModule extends ExternalModule {
 	}
 	
 	public void saveStandaloneWithContainerInfo() {
-		Preferences prefs = InstanceScope.INSTANCE.getNode(CloudFoundryPlugin.PLUGIN_ID);
+		IEclipsePreferences prefs = getPreferences();
 		prefs.putByteArray(String.format("%s:%s:%s", MODULE_ID, MODULE_VERSION, getApplicationId()),
 			SerializationUtils.serialize(standaloneWithContainerInfo));
 		try {
 			prefs.flush();
-		} catch (BackingStoreException e) {			
+		}
+		catch (BackingStoreException e) {
 			CloudFoundryPlugin
 			.getDefault()
 			.getLog()
 			.log(new Status(IStatus.ERROR, CloudFoundryPlugin.PLUGIN_ID,
 					"Can't save container directories information", e));
-		}	
+		}
 	}
 
 }
