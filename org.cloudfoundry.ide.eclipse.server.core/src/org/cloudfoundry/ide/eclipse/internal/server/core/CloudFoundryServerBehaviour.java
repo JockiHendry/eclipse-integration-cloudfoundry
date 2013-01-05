@@ -1152,7 +1152,7 @@ public class CloudFoundryServerBehaviour extends ServerBehaviourDelegate {
 					CloudApplication app = getCloudFoundryServer().getApplication(module[0]).getApplication();
 					if (app != null) {
 						int publishState = getServer().getModulePublishState(module);
-						if (publishState != IServer.PUBLISH_STATE_NONE) {
+						if (publishState != IServer.PUBLISH_STATE_NONE) {							
 							deployOrStartModule(module, false, monitor);
 						}
 					}
@@ -1650,29 +1650,16 @@ public class CloudFoundryServerBehaviour extends ServerBehaviourDelegate {
 								else {
 									if (descriptor.standaloneWithContainer==null) {
 										descriptor.applicationArchive = new StandaloneApplicationArchive(modules[0],
-											Arrays.asList(resources));
+											Arrays.asList(resources));										
 									} else {
-										// This is standalone framework application with container deployment
-										
-										// Always create a full war archive (no incremental publish support yet!)
-										if (descriptor.isIncrementalPublish && !hasChildModules(modules)) {
-										
-											handleIncrementalPublish(descriptor, modules);
-											
-										} else {
-											File warFile = CloudUtil.createWarFile(modules, server, progress);
-											if (!warFile.exists()) {
-												throw new CoreException(new Status(IStatus.ERROR, CloudFoundryPlugin.PLUGIN_ID,
-														"Unable to create war file"));
-											}
-											
-											// Create container archie
-											descriptor.applicationArchive = new StandaloneApplicationArchiveWithContainer(modules[0], 
-												Arrays.asList(resources), 
-												descriptor.standaloneWithContainer.getContainerDirectory(), 
-												descriptor.standaloneWithContainer.getDeployDirectory(),
-												warFile);
-										}
+										// This is standalone framework application with container deployment.
+										// Don't need to use incremental publish because vcap-java-client will upload
+										// only changed files.
+										descriptor.applicationArchive = new StandaloneApplicationArchiveWithContainer(modules, 
+											Arrays.asList(resources), 
+											descriptor.standaloneWithContainer.getContainerDirectory(), 
+											descriptor.standaloneWithContainer.getDeployDirectory(),
+											server);
 									}
 									
 								}

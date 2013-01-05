@@ -20,7 +20,10 @@ import java.util.List;
 
 import org.cloudfoundry.client.lib.archive.AbstractApplicationArchiveEntry;
 import org.cloudfoundry.client.lib.archive.ApplicationArchive;
+import org.cloudfoundry.ide.eclipse.internal.server.core.CloudUtil;
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.wst.server.core.IModule;
+import org.eclipse.wst.server.core.internal.Server;
 import org.eclipse.wst.server.core.model.IModuleResource;
 import org.springframework.util.Assert;
 
@@ -33,91 +36,97 @@ import org.springframework.util.Assert;
  */
 public class StandaloneApplicationArchiveWithContainer implements ApplicationArchive {
 	
-	private File containerDirectory;
+	private File containerDirectory, moduleDirectory;	
 	private List<Entry> containerDirectoryEntries;
-	private IModule module;
+	private IModule[] modules;
+	private String moduleTargetDirectoryName;
 	
-	public StandaloneApplicationArchiveWithContainer(IModule module, List<IModuleResource> resources, 
-			File containerDirectory, String moduleTargetDirectoryName, File warFile) {
+	public StandaloneApplicationArchiveWithContainer(IModule[] modules, List<IModuleResource> resources, 
+			File containerDirectory, String moduleTargetDirectoryName, Server server) {
 		
 		Assert.notNull(containerDirectory, "Container directory must not null");
 		Assert.isTrue(containerDirectory.isDirectory(), "Container directory must reference a directory");
-		this.module = module;
+		this.modules = modules;
+		this.moduleTargetDirectoryName = moduleTargetDirectoryName;
 		
 		// Process entries for container directory
 		this.containerDirectory = containerDirectory;
         List<Entry> containerDirectoryEntries = new ArrayList<Entry>();
-        collectEntries(containerDirectoryEntries, containerDirectory);
-        
-        // Proces entries for module directory which is usually inside container directory        
-        //if (moduleTargetDirectoryName==null) moduleTargetDirectoryName = "";
-        //this.moduleTargetDirectoryName = moduleTargetDirectoryName;
-        //collectModuleEntries(containerDirectoryEntries, resources.toArray(new IModuleResource[0]));        
-        containerDirectoryEntries.add(new ContainerEntryAdapter(warFile, moduleTargetDirectoryName));
+        collectEntriesForContainer(containerDirectoryEntries, containerDirectory);
 
+        // Process entries for project's module
+        try {
+			File temporaryOutput = CloudUtil.createTemporaryModuleOutput(modules, server, null);
+			this.moduleDirectory = temporaryOutput;
+			collectEntriesForProjectModule(containerDirectoryEntries, temporaryOutput);
+		}
+		catch (CoreException e) {
+			e.printStackTrace();
+		}
+        
         // Result
         this.containerDirectoryEntries = Collections.unmodifiableList(containerDirectoryEntries);       
 	}
 	
 	/**
-	 * Collect container entries
+	 * Collect container entries ex: tomcat7/bin/ tomcat7/conf 
 	 */
-    private void collectEntries(List<Entry> entries, File directory) {
+    private void collectEntriesForContainer(List<Entry> entries, File directory) {
         for (File child : directory.listFiles()) {
-            entries.add(new ContainerEntryAdapter(child));
+            entries.add(new ContainerEntryAdapter(child, containerDirectory));
             if (child.isDirectory()) {
-                collectEntries(entries, child);
+                collectEntriesForContainer(entries, child);
+            }
+        }
+    }
+    
+    /**
+     * Collect project modules (output) ex: WEB-INF/ META-INF/ classes/ 
+     */
+    private void collectEntriesForProjectModule(List<Entry> entries, File directory) {
+    	for (File child : directory.listFiles()) {
+            entries.add(new ContainerEntryAdapter(child, moduleTargetDirectoryName, moduleDirectory));
+            if (child.isDirectory()) {
+                collectEntriesForProjectModule(entries, child);
             }
         }
     }
 
     public String getFilename() {
-    	return module.getName();
+    	return modules[0].getName();
 	}
 
     public Iterable<Entry> getEntries() {
         return containerDirectoryEntries;
-    }
-    	
+    }            
+    
     private class ContainerEntryAdapter extends AbstractApplicationArchiveEntry {
 
         private File file;
         private String name;
 
-        /**
-         * Process a <code>File</code> that represent module resource.
-         * @param file is a <code>File</code> that represent module resource.
-         * @param directoryPrefix will be added as prefix to file name.
-         */
-        public ContainerEntryAdapter(File file, String directoryPrefix) {
-        	this.file = file;
-        	this.name = directoryPrefix + (directoryPrefix==null?"":"/") + file.getName();
-        	if(isDirectory()) {
-                this.name = this.name + "/";
-            }
-        }
-        
-//        public ContainerEntryAdapter(File file, String moduleName, String directoryPrefix) {
-//        	this.file = file;
-//        	String absolutePath = file.getAbsolutePath().replace(System.getProperty("file.separator", "/"), "/");
-//        	int startIndex = absolutePath.indexOf(moduleName) + moduleName.length() + 1;
-//        	this.name = directoryPrefix + (directoryPrefix==null?"":"/") + absolutePath.substring(startIndex);
-//        	if(isDirectory()) {
-//                this.name = this.name + "/";
-//            }
-//        }
-        
-        public ContainerEntryAdapter(File file) {
+        public ContainerEntryAdapter(File file, File container) {
             this.file = file;
             this.name = file.getAbsolutePath().replace(System.getProperty("file.separator", "/"), "/")
-            				.substring(containerDirectory.getAbsolutePath().length()+1);
+            				.substring(container.getAbsolutePath().length()+1);
             if(isDirectory()) {
                 this.name = this.name + "/";
             }
         }
-
-        public boolean isDirectory() {
-            return file.isDirectory();
+        
+        public ContainerEntryAdapter(File file, String directoryPrefix, File container) {
+        	this.file = file;
+        	String fileSeparator = System.getProperty("file.separator", "/");
+        	this.name = directoryPrefix.replace(fileSeparator, "/") + 
+        		(directoryPrefix.endsWith("/")?"":"/") + file.getAbsolutePath().replace(fileSeparator, "/")
+        		.substring(container.getAbsolutePath().length()+1);
+            if(isDirectory()) {
+                this.name = this.name + "/";
+            }
+        }
+                
+        public boolean isDirectory() {        	
+            return (file==null) || (file.isDirectory());
         }
 
         public String getName() {
